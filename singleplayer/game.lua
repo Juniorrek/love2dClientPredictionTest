@@ -14,4 +14,5 @@ end
 function Game.draw()
     Game.player:draw()
 end
+
 return Game
