@@ -9,6 +9,7 @@ local Client = {
 function Client.load()
     Client.host = enet.host_create()
     Client.server = Client.host:connect("localhost:6789")
+    Client.accumulator = 0
 
     Client.loaded = true
     print("Connecting on", Client.server)
@@ -40,6 +41,14 @@ function Client.pollNetwork()
     end
 end
 
+function Client.fixedUpdate()
+    Client.server:send(serpent.dump({
+        type = "input",
+        playerId = Client.player.id,
+        desiredDirection = Client.player.desiredDirection
+    }))
+end
+
 function Client.update(dt)
     if Client.loaded then
         Client.pollNetwork()
@@ -58,6 +67,12 @@ function Client.update(dt)
         end
 
         Client.player:update(dt)
+
+        Client.accumulator = Client.accumulator + dt
+        while Client.accumulator >= 1 / 20 do
+            Client.accumulator = Client.accumulator - 1 / 20
+            Client.fixedUpdate()
+        end
     end
 end
 

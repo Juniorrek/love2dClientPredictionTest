@@ -20,6 +20,14 @@ function Server.pollNetwork()
     while event do
         if event.type == "receive" then
             print("Message arrived on server: ", event.data, event.peer)
+            local ok, data = serpent.load(event.data)
+
+            if ok then     
+                if data.type == "input" then
+                    Server.players[data.playerId].desiredDirection = data.desiredDirection
+                    print(data.desiredDirection)
+                end 
+            end
         elseif event.type == "connect" then
             local player = PlayerLogic.new()
             Server.players[player.id] = player
@@ -45,6 +53,14 @@ function Server.update(dt)
     if Server.loaded then
         -- Poll network
         Server.pollNetwork()
+
+        -- Simulate
+        if #Server.players > 0 then    
+            for k, player in pairs(Server.players) do
+                player:update(dt)
+                print(player.position.grid.x)
+            end
+        end
 
         -- Broadcast snapshots
         --[[ Server.accumulator = Server.accumulator + dt
