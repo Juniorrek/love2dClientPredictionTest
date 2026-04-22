@@ -72,6 +72,64 @@ function PlayerLogic.new(id, x, y, speed)
         }
     end
 
+    function player:tryMoveByDesiredDirection() 
+        local desiredGridX = self.position.grid.x
+        local desiredGridY = self.position.grid.y
+        if self.desiredDirection == "up" then 
+            desiredGridY = desiredGridY - 1
+        elseif self.desiredDirection == "left" then
+            desiredGridX = desiredGridX - 1
+        elseif self.desiredDirection == "down" then
+            desiredGridY = desiredGridY + 1
+        elseif self.desiredDirection == "right" then
+            desiredGridX = desiredGridX + 1
+        end 
+
+        self.facing = self.desiredDirection
+        --if map.movableTile(x, y) and Entities.isFreeAt(x, y) then 
+            self.moving = true 
+            self.targetPosition.grid.x = desiredGridX
+            self.targetPosition.grid.y = desiredGridY
+        --[[ else
+            self.moving = false
+            self.animationFrame = 1
+            self.animationTimer = 0
+        end ]]
+    end
+
+    function player:update(dt)
+        if not self.moving and self.desiredDirection then 
+            self:tryMoveByDesiredDirection() 
+        end
+
+        if self.moving then
+            local move = self.speed * dt * 32
+            local targetDrawX = (self.targetPosition.grid.x - 1) * 32
+            local targetDrawY = (self.targetPosition.grid.y - 1) * 32
+            if self.facing == "up" then 
+                self.position.draw.y = math.max(self.position.draw.y - move, targetDrawY) 
+            elseif self.facing == "left" then 
+                self.position.draw.x = math.max(self.position.draw.x - move, targetDrawX) 
+            elseif self.facing == "down" then 
+                self.position.draw.y = math.min(self.position.draw.y + move, targetDrawY) 
+            elseif self.facing == "right" then 
+                self.position.draw.x = math.min(self.position.draw.x + move, targetDrawX) 
+            end
+
+            if self.position.draw.x == targetDrawX and self.position.draw.y == targetDrawY then
+                self.position.grid.x = self.targetPosition.grid.x
+                self.position.grid.y = self.targetPosition.grid.y
+                if not self.desiredDirection then
+                    self.moving = false
+                    self.animationFrame = 1
+                    self.animationTimer = 0
+                else 
+                    self:tryMoveByDesiredDirection() 
+                end
+            end
+        end
+    end
+
     function player:draw()
         love.graphics.draw(
             self.spritesheet,

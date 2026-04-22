@@ -44,6 +44,21 @@ function Client.update(dt)
     if Client.loaded then
         Client.pollNetwork()
     end
+
+    if Client.player then
+        Client.player.desiredDirection = nil
+        if love.keyboard.isDown("up") or love.keyboard.isDown("w") then
+            Client.player.desiredDirection = "up"
+        elseif love.keyboard.isDown("left") or love.keyboard.isDown("a") then
+            Client.player.desiredDirection = "left"
+        elseif love.keyboard.isDown("down") or love.keyboard.isDown("s") then
+            Client.player.desiredDirection = "down"
+        elseif love.keyboard.isDown("right") or love.keyboard.isDown("d") then
+            Client.player.desiredDirection = "right"
+        end
+
+        Client.player:update(dt)
+    end
 end
 
 
