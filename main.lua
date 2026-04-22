@@ -75,6 +75,14 @@ local function drawInstructions()
     elseif secondInstructions then
         love.graphics.print("F1 - Server + Client", 100, 100, 0, 3, 3)
         love.graphics.print("F2 - Only client", 100, 200, 0, 3, 3)
+    else
+        if game.player then
+            love.graphics.print("Singleplayer", 0, 0, 0, 2, 2)
+        elseif game.server then
+            love.graphics.print("Server + Client", 0, 0, 0, 2, 2)
+        else 
+            love.graphics.print("Only client", 0, 0, 0, 2, 2)
+        end
     end
 end
 
