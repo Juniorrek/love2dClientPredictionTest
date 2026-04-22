@@ -19,7 +19,7 @@ function Client.pollNetwork()
     local event = Client.host:service(0)
     while event do
         if event.type == "receive" then
-            print("Message arrived on client: ", event.data)
+            --print("Message arrived on client: ", event.data)
             local ok, data = serpent.load(event.data)
 
             if ok then     
@@ -30,7 +30,11 @@ function Client.pollNetwork()
                         data.player.position.grid.y,
                         data.player.speed
                     )
-                end 
+                elseif data.type == "update" then
+                    Client.player.position.grid.x = data.player.position.grid.x
+                    Client.player.position.grid.y = data.player.position.grid.y
+                    --print("end update")
+                end  
             end
         elseif event.type == "connect" then
             --print(event.peer, "connected.")
@@ -67,6 +71,7 @@ function Client.update(dt)
         end
 
         Client.player:update(dt)
+        --print("end prediction")
 
         Client.accumulator = Client.accumulator + dt
         while Client.accumulator >= 1 / 20 do

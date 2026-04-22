@@ -19,13 +19,12 @@ function Server.pollNetwork()
     local event = Server.host:service(0)
     while event do
         if event.type == "receive" then
-            print("Message arrived on server: ", event.data, event.peer)
+            --print("Message arrived on server: ", event.data, event.peer)
             local ok, data = serpent.load(event.data)
 
             if ok then     
                 if data.type == "input" then
                     Server.players[data.playerId].desiredDirection = data.desiredDirection
-                    print(data.desiredDirection)
                 end 
             end
         elseif event.type == "connect" then
@@ -47,6 +46,18 @@ function Server.pollNetwork()
 end
 
 function Server.fixedUpdate(dt)
+    -- Simulate    
+    for k, player in pairs(Server.players) do
+        -- ??Drawback of updating simulation state within fixed tick rate insted update loop??
+        player:update(dt)
+    end
+        
+    for k, player in pairs(Server.players) do
+        Server.peers[k]:send(serpent.dump({
+            type = "update",
+            player = player:dump()
+        }))
+    end
 end
 
 function Server.update(dt)
@@ -54,20 +65,12 @@ function Server.update(dt)
         -- Poll network
         Server.pollNetwork()
 
-        -- Simulate
-        if #Server.players > 0 then    
-            for k, player in pairs(Server.players) do
-                player:update(dt)
-                print(player.position.grid.x)
-            end
-        end
-
-        -- Broadcast snapshots
-        --[[ Server.accumulator = Server.accumulator + dt
-        while Server.accumulator == 1 / 60 do
+        -- Fixed updates & Broadcast snapshots
+        Server.accumulator = Server.accumulator + dt
+        while Server.accumulator >= 1 / 60 do
             Server.accumulator = Server.accumulator - 1 / 60
             Server.fixedUpdate(1 / 60)
-        end ]]
+        end
     end
 end
 
