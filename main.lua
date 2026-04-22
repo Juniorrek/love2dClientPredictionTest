@@ -79,7 +79,7 @@ local function drawInstructions()
         if game.player then
             love.graphics.print("Singleplayer", 0, 0, 0, 2, 2)
         elseif game.server then
-            love.graphics.print("Server + Client", 0, 0, 0, 2, 2)
+            love.graphics.print("Server + Client\nNormal - Client prediction + dumb reconciliation\nRed - Server state\nBlue - Client prediction without reconciliation", 0, 0, 0, 2, 2)
         else 
             love.graphics.print("Only client", 0, 0, 0, 2, 2)
         end

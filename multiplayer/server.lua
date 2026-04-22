@@ -60,6 +60,8 @@ function Server.fixedUpdate(dt)
     end
 end
 
+-- DECREASE TO TEST RECONCILIATION
+local SERVER_TICKRATE = 1/60
 function Server.update(dt)
     if Server.loaded then
         -- Poll network
@@ -67,9 +69,9 @@ function Server.update(dt)
 
         -- Fixed updates & Broadcast snapshots
         Server.accumulator = Server.accumulator + dt
-        while Server.accumulator >= 1 / 60 do
-            Server.accumulator = Server.accumulator - 1 / 60
-            Server.fixedUpdate(1 / 60)
+        while Server.accumulator >= SERVER_TICKRATE do
+            Server.accumulator = Server.accumulator - SERVER_TICKRATE
+            Server.fixedUpdate(SERVER_TICKRATE)
         end
     end
 end
