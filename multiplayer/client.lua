@@ -1,18 +1,34 @@
 local PlayerLogic = require("multiplayer.shared.playerLogic")
 local enet = require("enet")
 local serpent = require("multiplayer.libraries.serpent")
+local inputBuffer = require("multiplayer.client.inputBuffer")
 
 local Client = {
-    loaded = false
+    loaded = false,
+    tickRate = 1/60
 }
 
 function Client.load()
     Client.host = enet.host_create()
     Client.server = Client.host:connect("localhost:6789")
     Client.accumulator = 0
+    Client.prediction = true
+    Client.reconciliation = true
 
     Client.loaded = true
     print("Connecting on", Client.server)
+end
+
+function Client.applyAuthoritativeState(player, auth)
+    player.position.grid.x = auth.position.grid.x
+    player.position.grid.y = auth.position.grid.y
+    player.position.draw.x = auth.position.draw.x
+    player.position.draw.y = auth.position.draw.y
+    player.targetPosition.grid.x = auth.targetPosition.grid.x
+    player.targetPosition.grid.y = auth.targetPosition.grid.y
+    player.moving = auth.moving
+    player.facing = auth.facing
+    player.desiredDirection = auth.desiredDirection
 end
 
 function Client.pollNetwork()
@@ -39,34 +55,22 @@ function Client.pollNetwork()
                         data.player.position.grid.y,
                         data.player.speed
                     )
-                    --BLUE: Client predicted state without reconciliation
-                    Client.clientPredictedPlayerState = PlayerLogic.new(
-                        data.player.id,
-                        data.player.position.grid.x,
-                        data.player.position.grid.y,
-                        data.player.speed
-                    )
                 elseif data.type == "update" then
-                    Client.player.position.grid.x = data.player.position.grid.x
-                    Client.player.position.grid.y = data.player.position.grid.y
-                    Client.player.position.draw.x = data.player.position.draw.x
-                    Client.player.position.draw.y = data.player.position.draw.y
-                    Client.player.targetPosition.grid.x = data.player.targetPosition.grid.x
-                    Client.player.targetPosition.grid.y = data.player.targetPosition.grid.y
-                    Client.player.moving = data.player.moving
-                    Client.player.facing = data.player.facing
-                    Client.player.desiredDirection = data.player.desiredDirection
+                    if Client.reconciliation then
+                    -- RECONCILIATION
+                    -- 1 Apply authoritative state
+                    Client.applyAuthoritativeState(Client.player, data.player)
+                    -- 2 Remove acknowledged input
+                    inputBuffer.removeAcknowledged(data.lastProcessedInput)
+                    -- 3 Replay remaining inputs
+                        for i = 1, #inputBuffer.pending do
+                            local input = inputBuffer.pending[i]
+                            Client.player.desiredDirection = input.desiredDirection
+                            Client.player:update()
+                        end
+                    end
                     
-                    Client.serverPlayerState.position.grid.x = data.player.position.grid.x
-                    Client.serverPlayerState.position.grid.y = data.player.position.grid.y
-                    Client.serverPlayerState.position.draw.x = data.player.position.draw.x
-                    Client.serverPlayerState.position.draw.y = data.player.position.draw.y
-                    Client.serverPlayerState.targetPosition.grid.x = data.player.targetPosition.grid.x
-                    Client.serverPlayerState.targetPosition.grid.y = data.player.targetPosition.grid.y
-                    Client.serverPlayerState.moving = data.player.moving
-                    Client.serverPlayerState.facing = data.player.facing
-                    Client.serverPlayerState.desiredDirection = data.player.desiredDirection
-                    --print("end update")
+                    Client.applyAuthoritativeState(Client.serverPlayerState, data.player)
                 end  
             end
         elseif event.type == "connect" then
@@ -92,51 +96,53 @@ function Client.handleInput(player)
 end
 
 function Client.fixedUpdate()
-    Client.server:send(serpent.dump({
+    Client.handleInput(Client.player)
+
+    inputBuffer.nextSeq = inputBuffer.nextSeq + 1
+    local input = {
+        seq = inputBuffer.nextSeq,
+        desiredDirection = Client.player.desiredDirection
+    }
+    inputBuffer.push(input)
+    local inputPacket =  {
         type = "input",
         playerId = Client.player.id,
-        desiredDirection = Client.player.desiredDirection
-    }))
+        input = input
+    }
+    Client.server:send(serpent.dump(inputPacket))
+
+    if Client.prediction then
+        Client.player:update()
+    end
 end
 
-local CLIENT_TICKRATE = 1/60
 function Client.update(dt)
     if Client.loaded then
         Client.pollNetwork()
     end
 
     if Client.player then
-        Client.handleInput(Client.player)
-        Client.handleInput(Client.clientPredictedPlayerState)
-
-        Client.player:update(dt)
-        Client.clientPredictedPlayerState:update(dt)
-        --print("end prediction")
-
         Client.accumulator = Client.accumulator + dt
-        while Client.accumulator >= CLIENT_TICKRATE do
-            Client.accumulator = Client.accumulator - CLIENT_TICKRATE
+        while Client.accumulator >= Client.tickRate do
+            Client.accumulator = Client.accumulator - Client.tickRate
             Client.fixedUpdate()
         end
     end
 end
 
-
 function Client.draw()
     if Client.player then
         love.graphics.setColor(1, 0, 0)
         Client.serverPlayerState:draw()
-        love.graphics.setColor(0, 0, 1)
-        Client.clientPredictedPlayerState:draw()
         love.graphics.setColor(1, 1, 1)
-
         
         Client.player:draw()
-
         
-        love.graphics.print("Player (x = " .. Client.player.position.grid.x .. ", y = " ..  Client.player.position.grid.y .. " | dx = " .. Client.player.position.draw.x .. ", dy = " .. Client.player.position.draw.y .. ")\n" ..
-        "Red (x = " .. Client.serverPlayerState.position.grid.x .. ", y = " ..  Client.serverPlayerState.position.grid.y .. " | dx = " .. Client.serverPlayerState.position.draw.x .. ", dy = " .. Client.serverPlayerState.position.draw.y .. ")\n" ..
-        "Blue (x = " .. Client.clientPredictedPlayerState.position.grid.x .. ", y = " ..  Client.clientPredictedPlayerState.position.grid.y .. " | dx = " .. Client.clientPredictedPlayerState.position.draw.x .. ", dy = " .. Client.clientPredictedPlayerState.position.draw.y .. ")", 0, 225)
+        love.graphics.print("(F5 - Prediction [" .. (Client.prediction and "ON" or "OFF") .. "])", 100, 0)
+        love.graphics.print("(F6 - Reconciliation [" .. (Client.reconciliation and "ON" or "OFF") .. "])", 235, 0)
+
+        love.graphics.print("Client (x = " .. Client.player.position.grid.x .. ", y = " ..  Client.player.position.grid.y .. " | dx = " .. Client.player.position.draw.x .. ", dy = " .. Client.player.position.draw.y .. ")\n" ..
+        "Server (x = " .. Client.serverPlayerState.position.grid.x .. ", y = " ..  Client.serverPlayerState.position.grid.y .. " | dx = " .. Client.serverPlayerState.position.draw.x .. ", dy = " .. Client.serverPlayerState.position.draw.y .. ")", 0, 257)
     end
 end
 

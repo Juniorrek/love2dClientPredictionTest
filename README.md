@@ -1,9 +1,15 @@
 TODO
-- Client simulation on fixer tick rate too / Render still frame-rate based
-- Improve reconciliation
-    - Input sequence/buffer
+- Separate input sequence from simulation tick. Replay on tick not input sequence???
+- Separate simulation tick
+    - Simulation tick
+    - Input send rate
+    - Snapshot send rate
+    - Render rate
+- Fixed DT back
+- Interpolation
 
 LATER
-- Separate simulation tick, render frame rate and network send rate? Input batching? 
+- Separate responsibilities better. PlayerLogic shouldn't handle rendering...
 - If needed, for smoothness on rendering, interpolate between previous and current predicted state (if render FPS doesn’t line up exactly with 60 Hz / TEST)
-- Other players interpolation
+- Simulate lag for better tests
+- Input batching?

@@ -97,13 +97,13 @@ function PlayerLogic.new(id, x, y, speed)
         end ]]
     end
 
-    function player:update(dt)
+    function player:update()
         if not self.moving and self.desiredDirection then 
             self:tryMoveByDesiredDirection() 
         end
 
         if self.moving then
-            local move = self.speed * dt * 32
+            local move = self.speed * 0.5
             local targetDrawX = (self.targetPosition.grid.x - 1) * 32
             local targetDrawY = (self.targetPosition.grid.y - 1) * 32
             if self.facing == "up" then 

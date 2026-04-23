@@ -3,14 +3,14 @@ local enet = require("enet")
 local serpent = require("multiplayer.libraries.serpent")
 
 local Server = {
-    loaded = false
+    loaded = false,
+    tickRate = 1/60
 }
 
 function Server.load()
     Server.host = enet.host_create("localhost:6789")
     Server.accumulator = 0
     Server.players = {}
-    Server.peers = {}
 
     Server.loaded = true
 end
@@ -24,17 +24,23 @@ function Server.pollNetwork()
 
             if ok then     
                 if data.type == "input" then
-                    Server.players[data.playerId].desiredDirection = data.desiredDirection
+                    local nextInput = #Server.players[data.playerId].inputQueue
+                    Server.players[data.playerId].inputQueue[nextInput+1] = data.input
                 end 
             end
         elseif event.type == "connect" then
-            local player = PlayerLogic.new()
-            Server.players[player.id] = player
-            Server.peers[player.id] = event.peer
+            local playerServer = {
+                player = PlayerLogic.new(),
+                inputQueue = {},
+                lastProcessedInput = 0,
+                peer = event.peer
+            }
+
+            Server.players[playerServer.player.id] = playerServer
 
             event.peer:send(serpent.dump({
                 type = "initial",
-                player = player:dump()
+                player = playerServer.player:dump()
             }))
 
             print(event.peer, "connected.")
@@ -45,23 +51,31 @@ function Server.pollNetwork()
     end
 end
 
-function Server.fixedUpdate(dt)
-    -- Simulate    
-    for k, player in pairs(Server.players) do
+function Server.fixedUpdate()
+    -- Proccess Inputs and Simulate    
+    for k, playerServer in pairs(Server.players) do
+        for i = 1, #playerServer.inputQueue do
+            local input = playerServer.inputQueue[i]
+            playerServer.player.desiredDirection = input.desiredDirection
+            playerServer.lastProcessedInput = input.seq
+            --playerServer.player:update() -- change to simulation tick
+        end
+        playerServer.inputQueue = {}
+
         -- ??Drawback of updating simulation state within fixed tick rate insted update loop??
-        player:update(dt)
+        playerServer.player:update()
+        --one step per  tick instead per input queued
     end
         
-    for k, player in pairs(Server.players) do
-        Server.peers[k]:send(serpent.dump({
+    for k, playerServer in pairs(Server.players) do
+        playerServer.peer:send(serpent.dump({
             type = "update",
-            player = player:dump()
+            player = playerServer.player:dump(),
+            lastProcessedInput = playerServer.lastProcessedInput
         }))
     end
 end
 
--- DECREASE TO TEST RECONCILIATION
-local SERVER_TICKRATE = 1/60
 function Server.update(dt)
     if Server.loaded then
         -- Poll network
@@ -69,9 +83,9 @@ function Server.update(dt)
 
         -- Fixed updates & Broadcast snapshots
         Server.accumulator = Server.accumulator + dt
-        while Server.accumulator >= SERVER_TICKRATE do
-            Server.accumulator = Server.accumulator - SERVER_TICKRATE
-            Server.fixedUpdate(SERVER_TICKRATE)
+        while Server.accumulator >= Server.tickRate do
+            Server.accumulator = Server.accumulator - Server.tickRate
+            Server.fixedUpdate()
         end
     end
 end

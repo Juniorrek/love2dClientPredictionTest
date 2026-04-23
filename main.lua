@@ -12,6 +12,7 @@ end
 
 local firstInstructions = true
 local secondInstructions = false
+local multi = false
 function love.keypressed(key)
     if key == "escape" then
         love.event.quit()
@@ -32,9 +33,12 @@ function love.keypressed(key)
     elseif secondInstructions then
         if key == "f1" or key == "f2" then
             secondInstructions = false
+            multi = true
 
             Multiplayer.handleKeypressed(key)
         end
+    elseif multi then
+        Multiplayer.handleKeypressed(key)
     end
 end
 
@@ -68,6 +72,7 @@ local function drawGrid()
         end
     end
 end
+
 local function drawInstructions()
     if firstInstructions then
         love.graphics.print("F1 - Singleplayer", 100, 100, 0, 3, 3)
@@ -79,7 +84,7 @@ local function drawInstructions()
         if game.player then
             love.graphics.print("Singleplayer", 0, 0, 0, 2, 2)
         elseif game.server then
-            love.graphics.print("Server + Client\nNormal - Client prediction + dumb reconciliation\nRed - Server state\nBlue - Client prediction without reconciliation", 0, 0, 0, 2, 2)
+            love.graphics.print("Server + Client", 0, 0, 0, 2, 2)
         else 
             love.graphics.print("Only client", 0, 0, 0, 2, 2)
         end
